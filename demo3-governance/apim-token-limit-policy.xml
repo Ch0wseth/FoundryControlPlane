@@ -1,0 +1,70 @@
+<!--
+    APIM Policy for Token Rate Limiting on the Jedi Council Agent.
+
+    Apply this policy in Azure API Management (the AI Gateway)
+    to enforce token-per-minute limits on the registered agent.
+
+    How to apply:
+    1. Go to Azure Portal > API Management > chowseth-aigateway
+    2. APIs > select the jedi-council-agent API
+    3. Design tab > Inbound processing > Code editor
+    4. Paste this policy
+-->
+
+<policies>
+    <inbound>
+        <base />
+
+        <!--
+            Token Rate Limiting: 2000 tokens per minute per subscription.
+            Intentionally LOW for the demo so we can trigger 429s easily.
+
+            In production, set this based on:
+            - Team/project budget
+            - Model pricing tier
+            - Expected workload
+        -->
+        <llm-token-limit
+            tokens-per-minute="2000"
+            counter-key="@(context.Subscription.Id)"
+            estimate-prompt-tokens="true"
+            remaining-tokens-header-name="x-ratelimit-remaining-tokens"
+            tokens-consumed-header-name="x-ratelimit-tokens-consumed" />
+
+        <!--
+            Token Metrics Emission: for dashboards and cost tracking.
+            Emits token usage as a custom metric to Application Insights.
+        -->
+        <llm-emit-token-metric
+            namespace="JediCouncilAgent">
+            <dimension name="Subscription ID" value="@(context.Subscription.Id)" />
+            <dimension name="Agent" value="jedi-council-agent" />
+        </llm-emit-token-metric>
+
+        <!--
+            Optional: Content Safety header (if Azure Content Safety is configured)
+        -->
+        <!-- <llm-content-safety backend-id="content-safety-backend" /> -->
+
+    </inbound>
+
+    <backend>
+        <base />
+    </backend>
+
+    <outbound>
+        <base />
+
+        <!--
+            Add custom headers for demo visibility.
+            These help the test scripts display rate limit info.
+        -->
+        <set-header name="x-foundry-demo" exists-action="override">
+            <value>jedi-council-governance-demo</value>
+        </set-header>
+    </outbound>
+
+    <on-error>
+        <base />
+    </on-error>
+</policies>
